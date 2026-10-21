@@ -1,0 +1,254 @@
+/* Nexus Control Plane — Deep Space Black × Electric Violet
+ * Drop-in theme for Element Plus based admin templates.
+ * Import once from src/main.ts: import '@/styles/nexus-theme.css'
+ */
+
+:root {
+  /* brand */
+  --nx-primary: #8b5cf6;
+  --nx-primary-strong: #7c3aed;
+  --nx-primary-soft: rgba(139, 92, 246, 0.16);
+  --nx-accent: #22d3ee;
+  --nx-danger: #f43f5e;
+  --nx-success: #10b981;
+
+  /* surfaces */
+  --nx-bg: #05060a;
+  --nx-surface: #0b0d14;
+  --nx-surface-2: #11141f;
+  --nx-border: #1e2230;
+  --nx-text: #e5e7eb;
+  --nx-text-dim: #94a3b8;
+
+  /* Element Plus tokens */
+  --el-color-primary: var(--nx-primary);
+  --el-color-primary-light-3: #a78bfa;
+  --el-color-primary-light-5: #c4b5fd;
+  --el-color-primary-light-7: #ddd6fe;
+  --el-color-primary-light-8: #ede9fe;
+  --el-color-primary-light-9: var(--nx-primary-soft);
+  --el-color-primary-dark-2: var(--nx-primary-strong);
+
+  --el-bg-color: var(--nx-surface);
+  --el-bg-color-page: var(--nx-bg);
+  --el-bg-color-overlay: var(--nx-surface-2);
+  --el-fill-color-blank: var(--nx-surface);
+  --el-fill-color-light: var(--nx-surface-2);
+  --el-fill-color-lighter: #151827;
+
+  --el-text-color-primary: var(--nx-text);
+  --el-text-color-regular: #cbd5e1;
+  --el-text-color-secondary: var(--nx-text-dim);
+
+  --el-border-color: var(--nx-border);
+  --el-border-color-light: var(--nx-border);
+  --el-border-color-lighter: #171a26;
+
+  --el-box-shadow-light: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --el-mask-color: rgba(2, 4, 10, 0.72);
+  --el-font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html.dark,
+html {
+  color-scheme: dark;
+}
+
+body {
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(34, 211, 238, 0.10), transparent 55%),
+    var(--nx-bg);
+  color: var(--nx-text);
+}
+
+/* layout shells */
+.el-container,
+.el-main,
+.el-aside,
+.el-header {
+  background: transparent;
+}
+
+.el-aside,
+.sidebar-container {
+  background: linear-gradient(180deg, #080a12 0%, #05060a 100%) !important;
+  border-right: 1px solid var(--nx-border);
+}
+
+.el-header,
+.navbar {
+  background: rgba(8, 10, 18, 0.72) !important;
+  border-bottom: 1px solid var(--nx-border);
+  backdrop-filter: blur(12px);
+}
+
+/* cards / panels */
+.el-card,
+.el-dialog,
+.el-drawer,
+.el-message-box,
+.el-popper,
+.el-dropdown-menu {
+  background: var(--nx-surface) !important;
+  border: 1px solid var(--nx-border) !important;
+  box-shadow: 0 24px 64px -32px rgba(0, 0, 0, 0.9) !important;
+}
+
+.el-card__header {
+  border-bottom: 1px solid var(--nx-border);
+  color: var(--nx-text);
+}
+
+/* buttons */
+.el-button--primary {
+  background: linear-gradient(135deg, var(--nx-primary) 0%, var(--nx-primary-strong) 100%);
+  border: none;
+  box-shadow: 0 8px 24px -12px rgba(139, 92, 246, 0.9);
+}
+.el-button--primary:hover {
+  filter: brightness(1.08);
+}
+.el-button--default {
+  background: var(--nx-surface-2);
+  border-color: var(--nx-border);
+  color: var(--nx-text);
+}
+
+/* tables */
+.el-table,
+.el-table tr,
+.el-table th.el-table__cell,
+.el-table td.el-table__cell {
+  background: transparent !important;
+  color: var(--nx-text);
+}
+.el-table th.el-table__cell {
+  background: #0e1119 !important;
+  color: var(--nx-text-dim) !important;
+  font-weight: 500;
+}
+.el-table td.el-table__cell,
+.el-table th.el-table__cell.is-leaf {
+  border-bottom: 1px solid var(--nx-border) !important;
+}
+.el-table--border::after,
+.el-table--group::after,
+.el-table::before {
+  background-color: var(--nx-border);
+}
+.el-table__body tr:hover > td.el-table__cell {
+  background: rgba(139, 92, 246, 0.08) !important;
+}
+
+/* forms */
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  background: var(--nx-surface-2) !important;
+  box-shadow: 0 0 0 1px var(--nx-border) inset !important;
+  border-radius: 8px;
+}
+.el-input__inner,
+.el-textarea__inner {
+  color: var(--nx-text);
+}
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--nx-primary) inset, 0 0 0 4px var(--nx-primary-soft) !important;
+}
+
+/* menu */
+.el-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+.el-menu-item,
+.el-sub-menu__title {
+  color: var(--nx-text-dim) !important;
+  border-radius: 8px;
+  margin: 2px 8px;
+}
+.el-menu-item:hover,
+.el-sub-menu__title:hover {
+  background: rgba(139, 92, 246, 0.10) !important;
+  color: var(--nx-text) !important;
+}
+.el-menu-item.is-active {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.22), rgba(34, 211, 238, 0.08)) !important;
+  color: #fff !important;
+  box-shadow: inset 2px 0 0 var(--nx-primary);
+}
+
+/* badges, tags, pagination */
+.el-tag {
+  background: var(--nx-primary-soft);
+  border-color: transparent;
+  color: #c4b5fd;
+}
+.el-pagination {
+  --el-pagination-bg-color: transparent;
+  --el-pagination-button-color: var(--nx-text-dim);
+}
+
+/* login page */
+.login-container {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 500px at 20% 10%, rgba(139, 92, 246, 0.22), transparent 60%),
+    radial-gradient(700px 400px at 85% 90%, rgba(34, 211, 238, 0.12), transparent 55%),
+    var(--nx-bg);
+}
+.login-form {
+  width: min(92vw, 400px);
+  padding: 32px 28px;
+  border-radius: 20px;
+  background: rgba(11, 13, 20, 0.9);
+  border: 1px solid var(--nx-border);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 40px 120px -40px rgba(139, 92, 246, 0.55);
+}
+.login-form .title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #232838;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--nx-primary-strong);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* mobile: Element tables become extremely wide — make them scroll instead of
+   pushing the viewport, and collapse dialog width. */
+@media (max-width: 768px) {
+  .el-card__body {
+    padding: 14px;
+  }
+  .el-dialog {
+    width: 92vw !important;
+    max-width: 92vw !important;
+    margin-top: 8vh !important;
+  }
+  .el-table {
+    font-size: 12px;
+  }
+  .el-table__body-wrapper,
+  .el-table__header-wrapper {
+    overflow-x: auto;
+  }
+  .el-main {
+    padding: 12px !important;
+  }
+}

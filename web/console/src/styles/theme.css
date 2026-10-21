@@ -1,0 +1,178 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Light is the default; html.dark flips every variable. */
+:root {
+  --nx-primary: #7c3aed;
+  --nx-primary-strong: #6d28d9;
+  --nx-accent: #0891b2;
+  --nx-bg: #f4f5fa;
+  --nx-surface: #ffffff;
+  --nx-border: #e3e6ef;
+  --nx-text: #111827;
+  --nx-glass: rgba(255, 255, 255, 0.78);
+  --nx-panel: rgba(255, 255, 255, 0.92);
+
+  --el-color-primary: var(--nx-primary);
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: var(--nx-bg);
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f3f4f8;
+  --el-text-color-primary: #111827;
+  --el-text-color-regular: #374151;
+  --el-text-color-secondary: #6b7280;
+  --el-border-color: var(--nx-border);
+  --el-border-color-light: var(--nx-border);
+  --el-border-color-lighter: #eef0f6;
+  --el-mask-color: rgba(17, 24, 39, 0.45);
+}
+
+html.dark {
+  --nx-primary: #8b5cf6;
+  --nx-primary-strong: #7c3aed;
+  --nx-accent: #22d3ee;
+  --nx-bg: #09090b;
+  --nx-surface: #0f1014;
+  --nx-border: #1e2230;
+  --nx-text: #e5e7eb;
+  --nx-glass: rgba(9, 9, 11, 0.72);
+  --nx-panel: rgba(15, 16, 20, 0.82);
+
+  --el-color-primary: var(--nx-primary);
+  --el-color-primary-light-3: #a78bfa;
+  --el-color-primary-light-5: #c4b5fd;
+  --el-color-primary-light-7: #ddd6fe;
+  --el-color-primary-light-8: #ede9fe;
+  --el-color-primary-light-9: rgba(139, 92, 246, 0.16);
+  --el-color-primary-dark-2: var(--nx-primary-strong);
+  --el-bg-color: var(--nx-surface);
+  --el-bg-color-page: var(--nx-bg);
+  --el-bg-color-overlay: #12141d;
+  --el-fill-color-blank: var(--nx-surface);
+  --el-fill-color-light: #151827;
+  --el-text-color-primary: #e5e7eb;
+  --el-text-color-regular: #cbd5e1;
+  --el-text-color-secondary: #94a3b8;
+  --el-border-color: var(--nx-border);
+  --el-border-color-light: var(--nx-border);
+  --el-border-color-lighter: #171a26;
+  --el-mask-color: rgba(3, 4, 8, 0.72);
+}
+
+html, body, #app { height: 100%; }
+
+body {
+  margin: 0;
+  background-color: #f4f5fa;
+  background-image:
+    radial-gradient(1200px 600px at 12% -10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(34, 211, 238, 0.07), transparent 55%);
+  color: #111827;
+}
+
+html.dark body {
+  background-color: #09090b;
+  color: #e5e7eb;
+}
+
+.glass {
+  background: var(--nx-glass);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.nx-title {
+  @apply text-lg md:text-xl font-semibold tracking-tight;
+  color: var(--nx-text);
+}
+
+/* Panels in templates use dark literals; remap them in light mode instead of
+   duplicating every card with theme props. */
+html:not(.dark) [class*="bg-[#0f1014]"] { background: var(--nx-panel) !important; }
+html:not(.dark) [class*="bg-[#09090b]"] { background: #f1f3f9 !important; }
+html:not(.dark) [class*="border-[#1e2230]"] { border-color: var(--nx-border) !important; }
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-slate-300 { color: #1f2937 !important; }
+html:not(.dark) .text-slate-400 { color: #4b5563 !important; }
+html:not(.dark) .text-slate-500 { color: #6b7280 !important; }
+html:not(.dark) .text-slate-600 { color: #9ca3af !important; }
+
+/* iOS WebKit paints black boxes for children of backdrop-filter layers on light
+   backgrounds. Light mode uses solid panels anyway, so drop the blur there. */
+html:not(.dark) *,
+html:not(.dark) *::before,
+html:not(.dark) *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.el-tag {
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: var(--el-tag-border-color, transparent) !important;
+}
+
+.el-card, .el-dialog, .el-drawer, .el-message-box, .el-popper {
+  border: 1px solid var(--nx-border) !important;
+  background: var(--el-bg-color) !important;
+}
+/* Element's default button inherits fill vars that our theme overrides; pin it
+   explicitly so light mode doesn't render a black button. */
+html:not(.dark) .el-button:not(.el-button--primary):not(.is-link):not(.is-text) {
+  background-color: #ffffff !important;
+  border-color: var(--nx-border) !important;
+  color: #374151 !important;
+}
+html:not(.dark) .el-button:not(.el-button--primary):not(.is-link):not(.is-text):hover {
+  background-color: #f5f6fa !important;
+  border-color: var(--el-color-primary) !important;
+  color: var(--el-color-primary) !important;
+}
+
+.el-button--primary {
+  background: linear-gradient(135deg, var(--nx-primary), var(--nx-primary-strong));
+  border: none;
+  box-shadow: 0 8px 24px -14px rgba(124, 58, 237, 0.7);
+}
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: #f3f4f8;
+  --el-table-row-hover-bg-color: rgba(124, 58, 237, 0.06);
+  --el-table-border-color: var(--nx-border);
+  background: transparent;
+}
+html.dark .el-table {
+  --el-table-header-bg-color: #0d0f16;
+  --el-table-row-hover-bg-color: rgba(139, 92, 246, 0.08);
+}
+/* WebKit paints a stray black ring around prefix/suffix icons in light mode. */
+.el-input__prefix, .el-input__suffix,
+.el-input__prefix-inner, .el-input__suffix-inner,
+.el-input__icon, .el-input__prefix svg, .el-input__suffix svg {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.el-input__wrapper, .el-textarea__inner, .el-select__wrapper {
+  background: var(--el-fill-color-blank) !important;
+  box-shadow: 0 0 0 1px var(--nx-border) inset !important;
+}
+.el-input__wrapper.is-focus, .el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--nx-primary) inset, 0 0 0 4px rgba(124, 58, 237, 0.14) !important;
+}
+
+@media (max-width: 768px) {
+  .el-dialog { width: 92vw !important; max-width: 92vw !important; }
+  .el-drawer { width: 86vw !important; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #c7cbd8; border-radius: 8px; }
+html.dark ::-webkit-scrollbar-thumb { background: #232838; }
+::-webkit-scrollbar-thumb:hover { background: var(--nx-primary-strong); }

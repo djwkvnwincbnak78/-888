@@ -1,0 +1,427 @@
+openapi: 3.0.3
+info:
+  title: Nexus API
+  version: 0.6.0
+  description: |
+    OpenAI-compatible LLM gateway plus tenant-scoped admin APIs.
+    Public endpoints authenticate with `Authorization: Bearer <gateway-key>`;
+    admin endpoints authenticate with `X-Admin-Key`.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearerAuth: []
+paths:
+  /v1/chat/completions:
+    post:
+      summary: Chat completion (streaming optional)
+      tags: [inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChatRequest' }
+      responses:
+        '200':
+          description: Completion or SSE stream when `stream=true`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChatResponse' }
+            text/event-stream:
+              schema: { type: string }
+        '402': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+
+  /v1/models:
+    get:
+      summary: List configured models (`refresh=1` queries upstreams)
+      tags: [inference]
+      parameters:
+        - in: query
+          name: refresh
+          schema: { type: string, enum: ['1'] }
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, example: list }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Model' }
+
+  /v1/embeddings:
+    post:
+      summary: Create embeddings (OpenAI or Ollama)
+      tags: [inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmbeddingRequest' }
+      responses:
+        '200':
+          description: Vectors
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmbeddingResponse' }
+        '501': { $ref: '#/components/responses/Error' }
+
+  /v1/rerank:
+    post:
+      summary: Rerank documents (provider API or local BM25)
+      tags: [inference]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RerankRequest' }
+      responses:
+        '200':
+          description: Ranked documents
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RerankResponse' }
+
+  /health:
+    get:
+      summary: Liveness and backend status
+      security: []
+      responses:
+        '200':
+          description: Status document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  version: { type: string }
+                  storage: { type: string, enum: [memory, redis] }
+                  ledger: { type: string, enum: [memory, postgres] }
+
+  /metrics:
+    get:
+      summary: Prometheus exposition (version 0.0.4)
+      security: []
+      responses:
+        '200':
+          description: Text exposition
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /admin/api/orders:
+    post:
+      summary: Create a top-up order (role admin/owner)
+      tags: [admin]
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount: { type: string, example: '12.50' }
+                currency: { type: string, example: USD }
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /admin/api/orders/{id}:
+    get:
+      summary: Read one order (role viewer and above)
+      tags: [admin]
+      security:
+        - adminKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /admin/api/orders/{id}/pay:
+    post:
+      summary: Mark an order paid and credit the tenant account
+      tags: [admin]
+      security:
+        - adminKey: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paid order
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /admin/api/redeem:
+    post:
+      summary: Generate redeem codes (role admin/owner)
+      tags: [admin]
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, count]
+              properties:
+                amount: { type: string, example: '5.00' }
+                count: { type: integer, minimum: 1, maximum: 1000 }
+      responses:
+        '201':
+          description: Generated codes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, example: list }
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/RedeemCode' }
+
+  /admin/api/redeem/claim:
+    post:
+      summary: Claim a redeem code and credit the tenant account
+      tags: [admin]
+      security:
+        - adminKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: Claim result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string }
+                  amount: { type: number }
+                  status: { type: string }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+    adminKey:
+      type: apiKey
+      in: header
+      name: X-Admin-Key
+
+  responses:
+    Error:
+      description: Error envelope
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type: { type: string }
+            message: { type: string }
+
+    Message:
+      type: object
+      required: [role, content]
+      properties:
+        role: { type: string, enum: [system, developer, user, assistant, tool] }
+        content: { type: string }
+        name: { type: string }
+        tool_call_id: { type: string }
+        tool_calls:
+          type: array
+          items: { $ref: '#/components/schemas/ToolCall' }
+
+    Tool:
+      type: object
+      properties:
+        type: { type: string, example: function }
+        function:
+          type: object
+          properties:
+            name: { type: string }
+            description: { type: string }
+            parameters: { type: object }
+
+    ToolCall:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        function:
+          type: object
+          properties:
+            name: { type: string }
+            arguments: { type: string }
+
+    ChatRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model: { type: string }
+        messages:
+          type: array
+          items: { $ref: '#/components/schemas/Message' }
+        max_tokens: { type: integer }
+        temperature: { type: number }
+        top_p: { type: number }
+        stream: { type: boolean }
+        stop:
+          type: array
+          items: { type: string }
+        tools:
+          type: array
+          items: { $ref: '#/components/schemas/Tool' }
+        tool_choice: { type: object }
+        response_format: { type: object }
+
+    ChatResponse:
+      type: object
+      properties:
+        id: { type: string }
+        object: { type: string }
+        created: { type: integer }
+        model: { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              message: { $ref: '#/components/schemas/Message' }
+              finish_reason: { type: string }
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            completion_tokens: { type: integer }
+            total_tokens: { type: integer }
+
+    Model:
+      type: object
+      properties:
+        id: { type: string }
+        object: { type: string, example: model }
+        created: { type: integer }
+        owned_by: { type: string }
+
+    EmbeddingRequest:
+      type: object
+      required: [model, input]
+      properties:
+        model: { type: string }
+        input:
+          type: array
+          items: { type: string }
+        dimensions: { type: integer }
+        encoding_format: { type: string }
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        object: { type: string }
+        model: { type: string }
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              object: { type: string }
+              index: { type: integer }
+              embedding:
+                type: array
+                items: { type: number }
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            total_tokens: { type: integer }
+
+    RerankRequest:
+      type: object
+      required: [query, documents]
+      properties:
+        model: { type: string }
+        query: { type: string }
+        documents:
+          type: array
+          items: { type: string }
+        top_n: { type: integer }
+
+    RerankResponse:
+      type: object
+      properties:
+        model: { type: string }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              relevance_score: { type: number }
+              document: { type: string }
+        usage:
+          type: object
+          additionalProperties: { type: integer }
+
+    Order:
+      type: object
+      properties:
+        id: { type: string }
+        tenant_id: { type: integer }
+        amount: { type: number }
+        currency: { type: string }
+        status: { type: string, enum: [pending, paid, cancelled] }
+        created_at: { type: string, format: date-time }
+        paid_at: { type: string, format: date-time }
+
+    RedeemCode:
+      type: object
+      properties:
+        code: { type: string }
+        tenant_id: { type: integer }
+        amount: { type: number }
+        status: { type: string, enum: [active, claimed, revoked] }
+        created_at: { type: string, format: date-time }

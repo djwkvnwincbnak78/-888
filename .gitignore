@@ -1,0 +1,21 @@
+# build artifacts
+/super-gateway
+/dist/
+*.log
+
+# local secrets
+.env
+.env.local
+
+# editor / OS
+.DS_Store
+*.swp
+
+# accidental go build output
+/gateway
+
+# release binaries
+/super-gateway-v*
+
+# local notes
+GLOBAL.md

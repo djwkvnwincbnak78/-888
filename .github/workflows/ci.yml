@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: gateway
+          POSTGRES_PASSWORD: gateway
+          POSTGRES_DB: gateway
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gateway -d gateway"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DB_DSN: postgres://gateway:gateway@127.0.0.1:5432/gateway?sslmode=disable
+      TEST_REDIS_ADDR: 127.0.0.1:6379
+      GOMAXPROCS: 2
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Apply migrations
+        env:
+          PGPASSWORD: gateway
+        run: |
+          psql -h 127.0.0.1 -U gateway -d gateway -v ON_ERROR_STOP=1 -f migrations/001_init.sql
+          psql -h 127.0.0.1 -U gateway -d gateway -v ON_ERROR_STOP=1 -f migrations/002_rbac_admin.sql
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test with race detector
+        run: go test -race -count=1 ./...
+
+      - name: Coverage gate (cmd + core)
+        run: |
+          go test -coverprofile=cover.out ./...
+          go tool cover -func=cover.out | tail -1
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61
+          args: --timeout=5m
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t super-llm-gateway:ci .

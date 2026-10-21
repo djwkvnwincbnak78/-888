@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gateway}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gateway}
+      POSTGRES_DB: ${POSTGRES_DB:-gateway}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Schema is applied once on an empty data directory.
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gateway} -d ${POSTGRES_DB:-gateway}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    networks:
+      - gateway-net
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - gateway-net
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+      DB_DSN: postgres://${POSTGRES_USER:-gateway}:${POSTGRES_PASSWORD:-gateway}@postgres:5432/${POSTGRES_DB:-gateway}?sslmode=disable
+      REDIS_DSN: redis://redis:6379/0
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - gateway-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  gateway-net:
+    driver: bridge

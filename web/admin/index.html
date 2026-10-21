@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Nexus Console</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/vue@3.4.38/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+  html, body { max-width: 100%; overflow-x: hidden; }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+  table { border-collapse: separate; border-spacing: 0; }
+</style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased">
+<div id="app">
+
+  <!-- ================= login ================= -->
+  <div v-if="!token" class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <div class="space-y-1">
+        <h1 class="text-2xl font-semibold">Nexus Console</h1>
+        <p class="text-sm text-slate-400">LLM gateway control plane</p>
+      </div>
+      <input v-model="login.email" type="email" autocomplete="username" placeholder="邮箱"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+      <input v-model="login.password" type="password" autocomplete="current-password" placeholder="密码"
+             @keyup.enter="doLogin"
+             class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+      <button @click="doLogin" :disabled="busy"
+              class="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 font-medium disabled:opacity-50">
+        登录
+      </button>
+      <p v-if="error" class="text-sm text-rose-400 break-words" v-text="error"></p>
+    </div>
+  </div>
+
+  <!-- ================= shell ================= -->
+  <div v-else class="min-h-screen">
+
+    <!-- mobile top bar -->
+    <header class="md:hidden fixed top-0 inset-x-0 z-30 h-14 bg-slate-900/95 backdrop-blur border-b border-slate-800 flex items-center gap-3 px-4">
+      <button @click="mobileNav = true" aria-label="菜单" class="p-2 -ml-2 rounded-lg hover:bg-slate-800">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="font-semibold">Nexus</div>
+      <div class="ml-auto text-xs text-slate-500" v-text="currentLabel"></div>
+    </header>
+
+    <!-- mobile drawer -->
+    <div v-if="mobileNav" class="md:hidden fixed inset-0 z-40" @click.self="mobileNav = false">
+      <div class="absolute inset-0 bg-black/60"></div>
+      <aside class="absolute inset-y-0 left-0 w-64 max-w-[80vw] bg-slate-900 border-r border-slate-800 p-4 flex flex-col">
+        <div class="px-2 pb-4">
+          <div class="font-semibold text-lg">Nexus</div>
+          <div class="text-xs text-slate-500">v1.2 · control plane</div>
+        </div>
+        <nav class="space-y-1">
+          <button v-for="item in nav" :key="item.id" @click="go(item.id)"
+                  :class="['w-full text-left px-3 py-3 rounded-lg text-sm',
+                           page===item.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800/60']"
+                  v-text="item.label"></button>
+        </nav>
+        <div class="mt-auto pt-4 safe-bottom">
+          <button @click="logout" class="w-full text-left px-3 py-3 rounded-lg text-sm text-slate-500 hover:bg-slate-800/60">退出登录</button>
+          <div class="px-2 pt-2 text-[11px] text-slate-600 break-all" v-text="email"></div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="flex min-h-screen">
+      <!-- desktop sidebar -->
+      <aside class="hidden md:flex md:flex-col md:w-56 shrink-0 bg-slate-900/70 border-r border-slate-800 p-4">
+        <div class="px-2 pb-4">
+          <div class="font-semibold text-lg">Nexus</div>
+          <div class="text-xs text-slate-500">v1.2 · control plane</div>
+        </div>
+        <nav class="space-y-1">
+          <button v-for="item in nav" :key="item.id" @click="go(item.id)"
+                  :class="['w-full text-left px-3 py-2 rounded text-sm',
+                           page===item.id ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800/60']"
+                  v-text="item.label"></button>
+        </nav>
+        <div class="mt-auto pt-6">
+          <button @click="logout" class="w-full text-left px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-800/60">退出登录</button>
+          <div class="px-2 pt-2 text-[11px] text-slate-600 break-all" v-text="email"></div>
+        </div>
+      </aside>
+
+      <!-- content -->
+      <main class="flex-1 min-w-0 px-4 pb-8 pt-20 md:pt-6 md:px-6 space-y-4 md:space-y-6">
+        <p v-if="error" class="text-sm text-rose-400 break-words" v-text="error"></p>
+        <p v-if="notice" class="text-sm text-emerald-400 break-words" v-text="notice"></p>
+
+        <!-- ---------- dashboard ---------- -->
+        <section v-show="page==='dashboard'" class="space-y-4 md:space-y-6">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg md:text-xl font-semibold">数据概览</h2>
+            <button @click="loadDashboard" class="text-xs md:text-sm px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">刷新</button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 md:p-5 min-w-0">
+              <div class="text-xs text-slate-500">近 7 天请求</div>
+              <div class="text-2xl md:text-3xl font-semibold mt-1 break-all" v-text="fmt(dash.requests)"></div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 md:p-5 min-w-0">
+              <div class="text-xs text-slate-500">消耗 Token</div>
+              <div class="text-2xl md:text-3xl font-semibold mt-1 break-all" v-text="fmt(dash.tokens)"></div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 md:p-5 min-w-0">
+              <div class="text-xs text-slate-500">计费金额</div>
+              <div class="text-2xl md:text-3xl font-semibold mt-1 break-all" v-text="'$' + Number(dash.cost || 0).toFixed(6)"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 md:p-4 min-w-0">
+              <div class="text-sm text-slate-400 mb-2">请求趋势（7 天）</div>
+              <div id="lineChart" class="w-full h-52 md:h-64"></div>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 md:p-4 min-w-0">
+              <div class="text-sm text-slate-400 mb-2">模型 Token 占比</div>
+              <div id="pieChart" class="w-full h-52 md:h-64"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- channels ---------- -->
+        <section v-show="page==='channels'" class="space-y-3 md:space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-lg md:text-xl font-semibold">渠道管理</h2>
+            <div class="flex gap-2">
+              <button @click="loadChannels" class="text-xs md:text-sm px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">刷新</button>
+              <button @click="openChannelForm" class="text-xs md:text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 whitespace-nowrap">添加渠道</button>
+            </div>
+          </div>
+
+          <div class="md:hidden space-y-2">
+            <div v-for="c in channels" :key="c.id" class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 min-w-0">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="font-medium break-all" v-text="c.name"></div>
+                  <div class="text-xs text-slate-500" v-text="'#' + c.id + ' · ' + c.provider + ' · 权重 ' + c.weight"></div>
+                </div>
+                <span :class="['text-xs shrink-0', c.enabled ? 'text-emerald-400' : 'text-slate-500']"
+                      v-text="c.enabled ? '启用' : '禁用'"></span>
+              </div>
+              <div class="text-xs text-slate-400 break-all" v-text="(c.models || []).join(', ')"></div>
+              <div class="flex gap-2 pt-1">
+                <button @click="toggleChannel(c)" class="text-xs px-3 py-1.5 rounded bg-slate-800"
+                        v-text="c.enabled ? '禁用' : '启用'"></button>
+                <button @click="deleteChannel(c)" class="text-xs px-3 py-1.5 rounded bg-rose-900/60">删除</button>
+              </div>
+            </div>
+            <div v-if="!channels.length" class="text-center text-slate-500 py-8 text-sm">暂无渠道</div>
+          </div>
+
+          <div class="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+            <table class="w-full text-sm min-w-[720px]">
+              <thead class="text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th class="text-left p-3">ID</th><th class="text-left p-3">名称</th>
+                  <th class="text-left p-3">Provider</th><th class="text-left p-3">模型</th>
+                  <th class="text-left p-3">权重</th><th class="text-left p-3">状态</th>
+                  <th class="text-right p-3">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in channels" :key="c.id" class="border-b border-slate-800/60">
+                  <td class="p-3 text-slate-500" v-text="c.id"></td>
+                  <td class="p-3" v-text="c.name"></td>
+                  <td class="p-3" v-text="c.provider"></td>
+                  <td class="p-3 text-slate-400 text-xs" v-text="(c.models || []).join(', ')"></td>
+                  <td class="p-3" v-text="c.weight"></td>
+                  <td class="p-3">
+                    <span :class="c.enabled ? 'text-emerald-400' : 'text-slate-500'"
+                          v-text="c.enabled ? '启用' : '禁用'"></span>
+                  </td>
+                  <td class="p-3 text-right space-x-2 whitespace-nowrap">
+                    <button @click="toggleChannel(c)" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700"
+                            v-text="c.enabled ? '禁用' : '启用'"></button>
+                    <button @click="deleteChannel(c)" class="text-xs px-2 py-1 rounded bg-rose-900/60 hover:bg-rose-800">删除</button>
+                  </td>
+                </tr>
+                <tr v-if="!channels.length"><td colspan="7" class="p-6 text-center text-slate-500">暂无渠道</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ---------- tokens ---------- -->
+        <section v-show="page==='tokens'" class="space-y-3 md:space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-lg md:text-xl font-semibold">令牌管理</h2>
+            <div class="flex gap-2">
+              <button @click="loadTokens" class="text-xs md:text-sm px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700">刷新</button>
+              <button @click="createToken" class="text-xs md:text-sm px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 whitespace-nowrap">生成新令牌</button>
+            </div>
+          </div>
+
+          <div v-if="newToken" class="bg-emerald-950/50 border border-emerald-800 rounded-xl p-4 space-y-2 min-w-0">
+            <div class="text-sm text-emerald-300">令牌只显示一次，请立即保存：</div>
+            <div class="font-mono text-xs md:text-sm break-all bg-slate-950 border border-slate-800 rounded p-3" v-text="newToken"></div>
+          </div>
+
+          <div class="md:hidden space-y-2">
+            <div v-for="t in tokens" :key="t.id" class="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-1.5 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <div class="font-medium break-all" v-text="t.name"></div>
+                <span :class="['text-xs shrink-0', t.status === 'active' ? 'text-emerald-400' : 'text-slate-500']" v-text="t.status"></span>
+              </div>
+              <div class="font-mono text-xs text-slate-400 break-all" v-text="t.prefix + '…'"></div>
+              <div class="text-xs text-slate-400">
+                额度 <span v-text="Number(t.quota) === 0 ? '不限' : Number(t.quota)"></span>
+                · 已用 <span v-text="Number(t.used).toFixed(4)"></span>
+              </div>
+              <button @click="revokeToken(t)" class="text-xs px-3 py-1.5 rounded bg-rose-900/60 mt-1">吊销</button>
+            </div>
+            <div v-if="!tokens.length" class="text-center text-slate-500 py-8 text-sm">暂无令牌</div>
+          </div>
+
+          <div class="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-x-auto">
+            <table class="w-full text-sm min-w-[720px]">
+              <thead class="text-slate-400 border-b border-slate-800">
+                <tr>
+                  <th class="text-left p-3">ID</th><th class="text-left p-3">名称</th>
+                  <th class="text-left p-3">前缀</th><th class="text-left p-3">额度</th>
+                  <th class="text-left p-3">已用</th><th class="text-left p-3">状态</th>
+                  <th class="text-right p-3">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="t in tokens" :key="t.id" class="border-b border-slate-800/60">
+                  <td class="p-3 text-slate-500" v-text="t.id"></td>
+                  <td class="p-3" v-text="t.name"></td>
+                  <td class="p-3 font-mono text-xs" v-text="t.prefix + '…'"></td>
+                  <td class="p-3" v-text="Number(t.quota) === 0 ? '不限' : Number(t.quota)"></td>
+                  <td class="p-3" v-text="Number(t.used).toFixed(4)"></td>
+                  <td class="p-3">
+                    <span :class="t.status === 'active' ? 'text-emerald-400' : 'text-slate-500'" v-text="t.status"></span>
+                  </td>
+                  <td class="p-3 text-right">
+                    <button @click="revokeToken(t)" class="text-xs px-2 py-1 rounded bg-rose-900/60 hover:bg-rose-800">吊销</button>
+                  </td>
+                </tr>
+                <tr v-if="!tokens.length"><td colspan="7" class="p-6 text-center text-slate-500">暂无令牌</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- add-channel modal -->
+    <div v-if="showChannelForm" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="showChannelForm=false">
+      <div class="absolute inset-0 bg-black/70"></div>
+      <div class="relative w-full max-w-[90vw] md:max-w-lg max-h-[85vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="font-semibold">添加渠道</h3>
+          <button @click="showChannelForm=false" class="p-2 -mr-2 text-slate-400">✕</button>
+        </div>
+        <input v-model="channel.name" placeholder="渠道名，如 openai-main" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+        <select v-model="channel.provider" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base">
+          <option value="openai">openai</option>
+          <option value="anthropic">anthropic</option>
+          <option value="ollama">ollama</option>
+        </select>
+        <input v-model="channel.base_url" placeholder="Base URL（含 /v1）" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+        <input v-model="channel.api_key" placeholder="API Key（加密存储）" type="password" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+        <input v-model="channel.models" placeholder="模型列表，逗号分隔" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-base" />
+        <div class="flex gap-2 pt-1">
+          <button @click="createChannel" class="flex-1 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-medium">保存</button>
+          <button @click="showChannelForm=false" class="flex-1 py-2.5 rounded-lg bg-slate-800 text-sm">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createApp, reactive, ref, nextTick, computed } = Vue;
+
+createApp({
+  setup() {
+    const token = ref(localStorage.getItem('nexus_jwt') || '');
+    const email = ref(localStorage.getItem('nexus_email') || '');
+    const page = ref('dashboard');
+    const mobileNav = ref(false);
+    const nav = [
+      { id: 'dashboard', label: '数据概览' },
+      { id: 'channels', label: '渠道管理' },
+      { id: 'tokens', label: '令牌管理' },
+    ];
+    const currentLabel = computed(() => (nav.find(n => n.id === page.value) || {}).label || '');
+
+    const busy = ref(false);
+    const error = ref('');
+    const notice = ref('');
+    const login = reactive({ email: '', password: '' });
+
+    const dash = reactive({ requests: 0, tokens: 0, cost: 0, series: [], models: [] });
+    const channels = ref([]);
+    const tokens = ref([]);
+    const showChannelForm = ref(false);
+    const channel = reactive({ name: '', provider: 'openai', base_url: '', api_key: '', models: '' });
+    const newToken = ref('');
+
+    let lineChart = null, pieChart = null;
+
+    function fmt(n) { return Number(n || 0).toLocaleString(); }
+
+    async function api(path, options = {}) {
+      error.value = '';
+      const res = await fetch(path, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token.value,
+          ...(options.headers || {}),
+        },
+      });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
+      if (!res.ok) {
+        const msg = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+        error.value = msg;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    async function doLogin() {
+      busy.value = true; error.value = '';
+      try {
+        const res = await fetch('/admin/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(login),
+        });
+        const data = await res.json();
+        if (!res.ok) { error.value = (data.error && data.error.message) || '登录失败'; return; }
+        token.value = data.token;
+        email.value = data.email;
+        localStorage.setItem('nexus_jwt', data.token);
+        localStorage.setItem('nexus_email', data.email);
+        await loadDashboard();
+      } catch (e) {
+        error.value = '网络错误：' + e.message;
+      } finally {
+        busy.value = false;
+      }
+    }
+
+    function logout() {
+      token.value = ''; email.value = '';
+      localStorage.removeItem('nexus_jwt');
+      localStorage.removeItem('nexus_email');
+    }
+
+    async function go(id) {
+      page.value = id;
+      mobileNav.value = false;
+      if (id === 'dashboard') await loadDashboard();
+      if (id === 'channels') await loadChannels();
+      if (id === 'tokens') await loadTokens();
+    }
+
+    async function loadDashboard() {
+      try {
+        const d = await api('/admin/api/dashboard');
+        Object.assign(dash, d);
+        await nextTick();
+        renderCharts();
+      } catch (e) { /* surfaced */ }
+    }
+
+    function renderCharts() {
+      const lineEl = document.getElementById('lineChart');
+      const pieEl = document.getElementById('pieChart');
+      if (!lineEl || !pieEl) return;
+      lineChart = lineChart || echarts.init(lineEl);
+      pieChart = pieChart || echarts.init(pieEl);
+
+      const dates = (dash.series || []).map(p => p.date.slice(5));
+      const reqs = (dash.series || []).map(p => p.requests);
+
+      lineChart.setOption({
+        backgroundColor: 'transparent',
+        grid: { left: 36, right: 12, top: 16, bottom: 28 },
+        tooltip: { trigger: 'axis' },
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#475569' } },
+                 axisLabel: { color: '#94a3b8', fontSize: 10 } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#1e293b' } },
+                 axisLabel: { color: '#94a3b8', fontSize: 10 } },
+        series: [{ type: 'line', smooth: true, data: reqs, symbol: 'circle', symbolSize: 4,
+                   lineStyle: { width: 2, color: '#34d399' },
+                   areaStyle: { color: 'rgba(52,211,153,0.12)' },
+                   itemStyle: { color: '#34d399' } }],
+      }, true);
+
+      pieChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: { trigger: 'item' },
+        legend: { bottom: 0, textStyle: { color: '#94a3b8', fontSize: 10 } },
+        series: [{
+          type: 'pie', radius: ['42%', '66%'], center: ['50%', '42%'],
+          data: (dash.models || []).map(m => ({ name: m.model, value: m.tokens })),
+          label: { color: '#cbd5e1', fontSize: 10 },
+          itemStyle: { borderColor: '#0f172a', borderWidth: 2 },
+        }],
+      }, true);
+    }
+
+    async function loadChannels() {
+      try {
+        const res = await api('/admin/api/channels');
+        channels.value = res.data || [];
+      } catch (e) { /* surfaced */ }
+    }
+
+    async function createChannel() {
+      try {
+        await api('/admin/api/channels', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: channel.name,
+            provider: channel.provider,
+            base_url: channel.base_url,
+            api_key: channel.api_key,
+            models: channel.models.split(',').map(s => s.trim()).filter(Boolean),
+          }),
+        });
+        notice.value = '渠道已创建，15 秒内生效';
+        showChannelForm.value = false;
+        channel.name = ''; channel.base_url = ''; channel.api_key = ''; channel.models = '';
+        await loadChannels();
+      } catch (e) { /* surfaced */ }
+    }
+
+    function openChannelForm() {
+      showChannelForm.value = true;
+      error.value = ''; notice.value = '';
+    }
+
+    async function toggleChannel(c) {
+      try {
+        await api('/admin/api/channels/' + c.id, {
+          method: 'PATCH', body: JSON.stringify({ enabled: !c.enabled }),
+        });
+        await loadChannels();
+      } catch (e) { /* surfaced */ }
+    }
+
+    async function deleteChannel(c) {
+      if (!confirm('确认删除渠道 ' + c.name + '？')) return;
+      try {
+        await api('/admin/api/channels/' + c.id, { method: 'DELETE' });
+        await loadChannels();
+      } catch (e) { /* surfaced */ }
+    }
+
+    async function loadTokens() {
+      try {
+        const res = await api('/admin/api/tokens');
+        tokens.value = res.data || [];
+      } catch (e) { /* surfaced */ }
+    }
+
+    async function createToken() {
+      const name = prompt('令牌名称', 'default');
+      if (name === null) return;
+      const quota = prompt('额度（0 = 不限）', '0');
+      if (quota === null) return;
+      const days = prompt('有效天数（0 = 永久）', '0');
+      if (days === null) return;
+      try {
+        const res = await api('/admin/api/tokens', {
+          method: 'POST',
+          body: JSON.stringify({ name, quota, expires_days: Number(days) || 0 }),
+        });
+        newToken.value = res.token;
+        notice.value = '令牌已生成';
+        await loadTokens();
+      } catch (e) { /* surfaced */ }
+    }
+
+    async function revokeToken(t) {
+      if (!confirm('吊销令牌 ' + t.prefix + '…？')) return;
+      try {
+        await api('/admin/api/tokens/' + t.id, { method: 'DELETE' });
+        await loadTokens();
+      } catch (e) { /* surfaced */ }
+    }
+
+    window.addEventListener('resize', () => {
+      lineChart && lineChart.resize();
+      pieChart && pieChart.resize();
+    });
+
+    if (token.value) {
+      loadDashboard();
+    }
+
+    return {
+      token, email, page, nav, currentLabel, mobileNav, busy, error, notice, login,
+      dash, channels, tokens, showChannelForm, channel, newToken,
+      fmt, doLogin, logout, go, loadDashboard, loadChannels, createChannel,
+      openChannelForm, toggleChannel, deleteChannel, loadTokens, createToken, revokeToken,
+    };
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

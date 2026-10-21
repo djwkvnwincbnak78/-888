@@ -1,0 +1,7 @@
+# No third-party Go modules are used; the module cache is not needed.
+.git
+.gitignore
+super-gateway
+*.log
+.env
+docs
